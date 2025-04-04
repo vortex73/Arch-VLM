@@ -13,7 +13,6 @@ from bunny.util.utils import disable_torch_init
 from bunny.util.mm_utils import process_images, tokenizer_image_token, get_model_name_from_path, \
     KeywordsStoppingCriteria
 
-
 def load_image(image_file):
     if image_file.startswith('http://') or image_file.startswith('https://'):
         response = requests.get(image_file)
@@ -22,23 +21,24 @@ def load_image(image_file):
         image = Image.open(image_file).convert('RGB')
     return image
 
-
 def main(args):
-    # Model
     disable_torch_init()
 
     model_name = get_model_name_from_path(args.model_path)
-    tokenizer, model, image_processor, context_len = load_pretrained_model(args.model_path, args.model_base, model_name,
-                                                                           args.model_type, args.load_8bit,
-                                                                           args.load_4bit, device=args.device)
+    tokenizer, model, image_processor, context_len = load_pretrained_model(
+        args.model_path, 
+        args.model_base, 
+        model_name,
+        args.model_type, 
+        args.load_8bit,
+        args.load_4bit, 
+        device=args.device,
+        vision_encoder_type=args.vision_encoder  # Pass the encoder type
+    )
 
     conv_mode = "bunny"
-
     if args.conv_mode is not None and conv_mode != args.conv_mode:
-        print(
-            '[WARNING] the auto inferred conversation mode is {}, while `--conv-mode` is {}, using {}'.format(conv_mode,
-                                                                                                              args.conv_mode,
-                                                                                                              args.conv_mode))
+        print(f'[WARNING] the auto inferred conversation mode is {conv_mode}, while `--conv-mode` is {args.conv_mode}, using {args.conv_mode}')
     else:
         args.conv_mode = conv_mode
 
@@ -46,7 +46,6 @@ def main(args):
     roles = conv.roles
 
     image = load_image(args.image_file)
-    # Similar operation in model_worker.py
     image_tensor = process_images([image], image_processor, model.config)
     if type(image_tensor) is list:
         image_tensor = [image.to(model.device, dtype=model.dtype) for image in image_tensor]
@@ -65,7 +64,6 @@ def main(args):
         print(f"{roles[1]}: ", end="")
 
         if image is not None:
-            # first message
             inp = DEFAULT_IMAGE_TOKEN + '\n' + inp
             conv.append_message(conv.roles[0], inp)
             image = None
@@ -99,7 +97,6 @@ def main(args):
         if args.debug:
             print("\n", {"prompt": prompt, "outputs": outputs}, "\n")
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-path", type=str, default=None)
@@ -114,5 +111,8 @@ if __name__ == "__main__":
     parser.add_argument("--load-8bit", action="store_true")
     parser.add_argument("--load-4bit", action="store_true")
     parser.add_argument("--debug", action="store_true")
+    # Add vision encoder argument
+    parser.add_argument("--vision-encoder", type=str, default=None,
+                       help="Type of vision encoder to use")
     args = parser.parse_args()
     main(args)

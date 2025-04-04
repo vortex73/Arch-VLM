@@ -11,9 +11,15 @@ from bunny.model import *
 
 
 def load_pretrained_model(model_path, model_base, model_name, model_type, load_8bit=False, load_4bit=False,
-                          device_map="auto", device="cuda", **kwargs):
+                          device_map="auto", vision_encoder_type=None, device="cuda", **kwargs):
     if model_type not in {'phi-1.5', 'phi-2', 'phi-3', 'stablelm-2', 'qwen1.5-1.8b', 'minicpm', 'llama3-8b'}:
         raise ValueError(f"Unknown Model Type {model_type}")
+
+    def set_vision_encoder(config):
+        if vision_encoder_type is not None:
+            config.encoder_type = vision_encoder_type
+            config.mm_vision_tower = vision_encoder_type
+        return config
 
     kwargs = {"device_map": device_map, **kwargs}
 
@@ -39,6 +45,7 @@ def load_pretrained_model(model_path, model_base, model_name, model_type, load_8
             'There is `lora` in model name but no `model_base` is provided. If you are loading a LoRA model, please provide the `model_base` argument.')
     if 'lora' in model_name.lower() and model_base is not None:
         lora_cfg_pretrained = AutoConfig.from_pretrained(model_path)
+        lora_cfg_pretrained = set_vision_encoder(lora_cfg_pretrained)
 
         print('Loading Bunny from base model...')
         if model_type == 'phi-1.5' or model_type == 'phi-2':
@@ -108,6 +115,7 @@ def load_pretrained_model(model_path, model_base, model_name, model_type, load_8
         print('Loading Bunny from base model...')
 
         cfg_pretrained = AutoConfig.from_pretrained(model_path)
+        cfg_pretrained = set_vision_encoder(cfg_pretrained)
         if model_type == 'phi-1.5' or model_type == 'phi-2':
             tokenizer = AutoTokenizer.from_pretrained(model_base, use_fast=True)
             model = BunnyPhiForCausalLM.from_pretrained(model_base, low_cpu_mem_usage=True,
@@ -140,6 +148,7 @@ def load_pretrained_model(model_path, model_base, model_name, model_type, load_8
         if model_type == 'phi-1.5' or model_type == 'phi-2':
             tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
             model = BunnyPhiForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, **kwargs)
+            model.config = set_vision_encoder(model.config)
         elif model_type == 'phi-3':
             tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=True)
             model = BunnyPhi3ForCausalLM.from_pretrained(model_path, low_cpu_mem_usage=True, **kwargs)
